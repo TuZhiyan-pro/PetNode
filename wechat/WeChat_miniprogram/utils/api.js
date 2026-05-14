@@ -1,148 +1,76 @@
-const BASE_URL = 'http://127.0.0.1:5000/api/v1';
+/**
+ * utils/api.js
+ * PetNode 全局网络请求封装
+ */
 
+// 🚨 你的 Flask 后端基础地址
+// 如果是在本机电脑跑 Flask + 微信开发者工具，填 http://127.0.0.1:5000
+// 如果是真机调试，需要填你电脑局域网的 IP (比如 http://192.168.x.x:5000)
+const BASE_URL = 'http://127.0.0.1:5000';
+
+/**
+ * 核心请求函数
+ * @param {string} url - 接口路径 (例如: /api/v1/me)
+ * @param {string} method - 请求方式 (GET, POST, PUT, DELETE)
+ * @param {object} data - 提交的数据
+ */
 const request = (url, method = 'GET', data = {}) => {
   return new Promise((resolve, reject) => {
+    // 1. 设置请求头
+    let header = {
+      'Content-Type': 'application/json'
+    };
+
+    // 2. 自动携带身份令牌 (Token)
+    // 假设我们登录后把 token 存在了缓存的 'access_token' 里
     const token = wx.getStorageSync('access_token');
+    if (token) {
+      header['Authorization'] = `Bearer ${token}`; 
+    }
+
+    // 3. 发起请求
     wx.request({
       url: BASE_URL + url,
       method: method,
       data: data,
-      header: {
-        'Content-Type': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : ''
-      },
+      header: header,
       success: (res) => {
-        if (res.statusCode === 200 || res.statusCode === 201) {
-          const body = res.data;
-          if (body.code === 0) {
-            resolve(body.data);
-          } else {
-            wx.showToast({ title: body.message || '请求失败', icon: 'error' });
-            reject(body);
-          }
-        } else if (res.statusCode === 401) {
-          wx.showToast({ title: '登录已过期', icon: 'none' });
-          wx.removeStorageSync('access_token');
-          wx.reLaunch({ url: '/pages/login/login' });
-          reject('Unauthorized');
-        } else {
-          wx.showToast({ title: (res.data && res.data.message) || '请求失败', icon: 'error' });
+        const statusCode = res.statusCode;
+        
+        // --- 状态码 2xx: 成功 ---
+        if (statusCode >= 200 && statusCode < 300) {
+          resolve(res.data);
+        } 
+        // --- 状态码 401: 身份过期 / 未登录 ---
+        else if (statusCode === 401) {
+          wx.removeStorageSync('access_token'); // 清除失效的 token
+          wx.showToast({ title: '登录已过期，请重新登录', icon: 'none' });
+          // 这里可以加上跳转到登录页的逻辑，例如:
+          // wx.redirectTo({ url: '/pages/login/login' });
+          reject(res.data);
+        } 
+        // --- 其他错误 ---
+        else {
+          wx.showToast({ 
+            title: res.data.message || '请求失败', 
+            icon: 'none' 
+          });
           reject(res.data);
         }
       },
       fail: (err) => {
-        wx.showToast({ title: '网络异常', icon: 'error' });
+        wx.showToast({ title: '网络连接异常，请检查网络', icon: 'none' });
         reject(err);
       }
     });
   });
 };
 
-const qs = (params) => {
-  if (!params) return '';
-  const keys = Object.keys(params).filter(k => params[k] !== undefined && params[k] !== null);
-  if (keys.length === 0) return '';
-  return '?' + keys.map(k => `${k}=${encodeURIComponent(params[k])}`).join('&');
-};
-
+// 导出便捷方法
 module.exports = {
-  // ===== 微信认证 =====
-  wxLoginAndAuth(code) {
-    return request('/wechat/auth', 'POST', { code });
-  },
-
-  bindWechatUser(data) {
-    return request('/wechat/bind', 'POST', data);
-  },
-
-  unbindWechat() {
-    return request('/wechat/unbind', 'POST');
-  },
-
-  // ===== 用户信息 =====
-  fetchCurrentUser() {
-    return request('/me');
-  },
-
-  updateProfile(data) {
-    return request('/me', 'PUT', data);
-  },
-
-  // ===== 设备管理 =====
-  bindDevice(data) {
-    return request('/devices/bind', 'POST', data);
-  },
-
-  unbindDevice(deviceId) {
-    return request(`/devices/${deviceId}/unbind`, 'POST');
-  },
-
-  // ===== 宠物列表与详情 =====
-  fetchPets() {
-    return request('/pets');
-  },
-
-  fetchPetSummary(petId) {
-    return request(`/pets/${petId}/summary`);
-  },
-
-  updatePet(petId, data) {
-    return request(`/pets/${petId}`, 'PUT', data);
-  },
-
-  // ===== 健康数据 =====
-  fetchRespirationLatest(petId) {
-    return request(`/pets/${petId}/respiration/latest`);
-  },
-
-  fetchRespirationSeries(petId, params = {}) {
-    return request(`/pets/${petId}/respiration/series${qs(params)}`);
-  },
-
-  fetchHeartRateLatest(petId) {
-    return request(`/pets/${petId}/heart-rate/latest`);
-  },
-
-  fetchHeartRateSeries(petId, params = {}) {
-    return request(`/pets/${petId}/heart-rate/series${qs(params)}`);
-  },
-
-  fetchTemperatureSeries(petId, params = {}) {
-    return request(`/pets/${petId}/temperature/series${qs(params)}`);
-  },
-
-  // ===== 定位 =====
-  fetchPetLocation(petId) {
-    return request(`/pets/${petId}/location/latest`);
-  },
-
-  // ===== 事件/告警 =====
-  fetchPetEvents(petId, params = {}) {
-    return request(`/pets/${petId}/events${qs(params)}`);
-  },
-
-  markEventRead(petId, eventId) {
-    return request(`/pets/${petId}/events/${eventId}/read`, 'PUT');
-  },
-
-  // ===== 家庭组 =====
-  createFamily() {
-    return request('/family', 'POST');
-  },
-
-  inviteFamily(expiresIn) {
-    return request('/family/invite', 'POST', { expires_in: expiresIn });
-  },
-
-  joinFamily(inviteToken) {
-    return request('/family/join', 'POST', { invite_token: inviteToken });
-  },
-
-  fetchFamilyMembers() {
-    return request('/family/members');
-  },
-
-  removeFamilyMember(userId) {
-    return request(`/family/members/${userId}`, 'DELETE');
-  }
+  BASE_URL,
+  get: (url, data) => request(url, 'GET', data),
+  post: (url, data) => request(url, 'POST', data),
+  put: (url, data) => request(url, 'PUT', data),
+  delete: (url, data) => request(url, 'DELETE', data)
 };

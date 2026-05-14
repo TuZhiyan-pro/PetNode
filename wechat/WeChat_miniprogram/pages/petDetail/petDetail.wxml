@@ -1,31 +1,31 @@
 <scroll-view class="detail-container" scroll-y="true">
-  
+
   <view class="custom-back-btn" bindtap="goBack">
     <view class="back-arrow"></view>
   </view>
 
   <view class="map-section">
-    <map 
-      class="realtime-map" 
-      longitude="{{longitude}}" 
-      latitude="{{latitude}}" 
-      scale="15" 
+    <map
+      class="realtime-map"
+      longitude="{{longitude}}"
+      latitude="{{latitude}}"
+      scale="15"
       markers="{{markers}}"
       show-location>
     </map>
   </view>
 
   <view class="health-section">
-    
+
     <view class="chart-card" wx:for="{{healthCharts}}" wx:key="id">
-      
+
       <view class="card-header">
         <text class="chart-title">{{item.title}}</text>
         <view class="average-data">
           <text class="avg-number">{{item.average}}</text>
           <text class="avg-unit">{{item.unit}}</text>
         </view>
-        <text class="date-range">{{item.dateRange || '---'}}</text>
+        <text class="date-range">2026年5月1日 - 7日</text>
       </view>
 
       <view class="css-chart-box">
@@ -47,7 +47,7 @@
       </view>
 
     </view>
-    
+
     <view style="height: 100rpx;"></view>
   </view>
 
